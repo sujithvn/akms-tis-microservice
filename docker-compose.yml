@@ -1,0 +1,77 @@
+services:
+  main_http_api:
+    build:
+      context: .
+      dockerfile: ./apps/main-http-api/Dockerfile
+      target: development
+      # container_name: main-http-api
+    command: npm run start:dev main-http-api
+    # env_file:
+    #   - ./apps/main_http_api/.env
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+    ports:
+      - "3000:3000"
+
+  key_manage_service:
+    build:
+      context: .
+      dockerfile: ./apps/key-manage-service/Dockerfile
+      target: development
+      # container_name: key-manage-service
+    command: npm run start:dev key-manage-service
+    # env_file:
+    #   - ./app/key-manage-service/.env
+    depends_on:
+      - kms_pg_db
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+
+
+  token_info_service:
+    build:
+      context: .
+      dockerfile: ./apps/token-info-service/Dockerfile
+      target: development
+      # container_name: token-info-service
+    command: npm run start:dev token-info-service
+    # env_file:
+    #   - ./app/token-info-service/.env
+    depends_on:
+      - tis_mongo_db
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+
+  nats:
+    image: nats
+    ports:
+      - 4222:4222
+
+  kms_pg_db:
+    image: postgres:15.3-alpine3.18
+    restart: always
+    environment:
+      - POSTGRES_DB=key_manage_service
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - '5432:5432'
+    volumes: 
+      - ./db:/data/pg_db
+      - ./create-kms-db.sql:/docker-entrypoint-initdb.d/create_database.sql
+
+  tis_mongo_db:
+    image: mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./db:/data/mongo_db
+      - ./init-mongo.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    environment:
+      - MONGO_INITDB_DATABASE=token_info_service
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=password
